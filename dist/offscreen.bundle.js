@@ -28668,6 +28668,9 @@ This typically indicates that your device does not have a healthy Internet conne
   function log(...args) {
     console.log("[zeta-overlay-pc/offscreen]", ...args);
   }
+  function setStorage(payload) {
+    chrome.runtime.sendMessage({ target: "background", type: "STORAGE_SET", payload });
+  }
   function stopListening() {
     if (unsubscribe) {
       unsubscribe();
@@ -28687,7 +28690,7 @@ This typically indicates that your device does not have a healthy Internet conne
           mappings[doc2.id] = data.imageUrl;
         });
         log(`\uB9E4\uD551 ${Object.keys(mappings).length}\uAC74 \uC218\uC2E0`, mappings);
-        chrome.storage.local.set({
+        setStorage({
           zetaMappings: mappings,
           zetaMappingsSyncedAt: Date.now(),
           zetaSyncStatus: "connected"
@@ -28695,7 +28698,7 @@ This typically indicates that your device does not have a healthy Internet conne
       },
       (error) => {
         log("Firestore \uAD6C\uB3C5 \uC5D0\uB7EC:", error);
-        chrome.storage.local.set({
+        setStorage({
           zetaSyncStatus: "error",
           zetaSyncError: error.message
         });
@@ -28710,7 +28713,7 @@ This typically indicates that your device does not have a healthy Internet conne
         } else {
           signInAnonymously(auth).catch((err) => {
             log("\uC775\uBA85 \uB85C\uADF8\uC778 \uC2E4\uD328:", err);
-            chrome.storage.local.set({
+            setStorage({
               zetaSyncStatus: "error",
               zetaSyncError: "auth failed: " + err.message
             });
@@ -28727,7 +28730,7 @@ This typically indicates that your device does not have a healthy Internet conne
           startListening(message.ownerUid);
         } else {
           stopListening();
-          chrome.storage.local.set({ zetaSyncStatus: "disconnected" });
+          setStorage({ zetaSyncStatus: "disconnected" });
         }
       });
       sendResponse({ ok: true });
@@ -28737,11 +28740,14 @@ This typically indicates that your device does not have a healthy Internet conne
     }
     return true;
   });
-  chrome.storage.local.get(["zetaOwnerUid"], (result) => {
-    if (result.zetaOwnerUid) {
-      ensureSignedIn().then(() => startListening(result.zetaOwnerUid));
+  chrome.runtime.sendMessage(
+    { target: "background", type: "REQUEST_OWNER_UID" },
+    (response) => {
+      if (response?.ownerUid) {
+        ensureSignedIn().then(() => startListening(response.ownerUid));
+      }
     }
-  });
+  );
   log("offscreen document \uC900\uBE44 \uC644\uB8CC");
 })();
 /*! Bundled license information:

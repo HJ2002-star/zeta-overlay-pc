@@ -59,4 +59,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true; // 비동기 응답
   }
+
+  // offscreen 문서는 chrome.storage를 직접 못 쓰므로(공식 제약),
+  // 대신 여기서 chrome.storage.local에 써준다.
+  if (message.type === "STORAGE_SET") {
+    chrome.storage.local.set(message.payload || {});
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  // offscreen 문서가 재시작 시 마지막 ownerUid를 물어볼 때 응답
+  if (message.type === "REQUEST_OWNER_UID") {
+    chrome.storage.local.get(["zetaOwnerUid"], (result) => {
+      sendResponse({ ownerUid: result.zetaOwnerUid || null });
+    });
+    return true; // 비동기 응답
+  }
 });
