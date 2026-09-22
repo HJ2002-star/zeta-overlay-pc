@@ -4,9 +4,10 @@
 // 오래 살아있는 offscreen 문서 쪽에서 리스너를 유지합니다.
 
 import { initializeApp } from "firebase/app";
-// firebase/auth: 크롬 익스텐션 환경(서비스 워커, 팝업, offscreen 문서)에서
-// signInAnonymously 등을 안전하게 쓰기 위한 Firebase 공식 진입점입니다.
-// (signInWithPopup처럼 별도 웹사이트+iframe이 필요한 방식이 아니라면 이걸로 충분합니다)
+// offscreen 문서는 (서비스 워커와 달리) 일반 웹페이지처럼 DOM/IndexedDB를 쓸 수 있으므로,
+// chrome.storage.local에 의존하는 firebase/auth/web-extension 대신 일반 firebase/auth를 씁니다.
+// (web-extension 진입점은 DOM이 없는 서비스 워커/팝업용으로, offscreen에서 쓰면
+// 세션 저장 시 chrome.storage.local을 호출하다가 에러가 납니다 — offscreen은 그 API를 못 씀)
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import {
   getFirestore,
@@ -24,6 +25,12 @@ let currentOwnerUid = null;
 
 function log(...args) {
   console.log("[zeta-overlay-pc/offscreen]", ...args);
+}
+
+// offscreen 문서는 chrome.storage를 직접 쓸 수 없고 chrome.runtime만 지원되므로
+// (Chrome 공식 문서 기준), background 서비스 워커에게 대신 저장해달라고 메시지를 보낸다.
+function setStorage(payload) {
+  chrome.runtime.sendMessage({ target: "background", type: "STORAGE_SET", payload });
 }
 
 function stopListening() {
@@ -53,7 +60,7 @@ function startListening(ownerUid) {
 
       log(`매핑 ${Object.keys(mappings).length}건 수신`, mappings);
 
-      chrome.storage.local.set({
+      setStorage({
         zetaMappings: mappings,
         zetaMappingsSyncedAt: Date.now(),
         zetaSyncStatus: "connected",
@@ -61,7 +68,7 @@ function startListening(ownerUid) {
     },
     (error) => {
       log("Firestore 구독 에러:", error);
-      chrome.storage.local.set({
+      setStorage({
         zetaSyncStatus: "error",
         zetaSyncError: error.message,
       });
@@ -77,7 +84,7 @@ async function ensureSignedIn() {
       } else {
         signInAnonymously(auth).catch((err) => {
           log("익명 로그인 실패:", err);
-          chrome.storage.local.set({
+          setStorage({
             zetaSyncStatus: "error",
             zetaSyncError: "auth failed: " + err.message,
           });
@@ -97,7 +104,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         startListening(message.ownerUid);
       } else {
         stopListening();
-        chrome.storage.local.set({ zetaSyncStatus: "disconnected" });
+        setStorage({ zetaSyncStatus: "disconnected" });
       }
     });
     sendResponse({ ok: true });
@@ -111,11 +118,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // 서비스 워커가 재시작돼서 offscreen 문서도 새로 만들어졌을 경우,
-// 마지막으로 저장해둔 ownerUid를 읽어와서 자동으로 구독을 재개합니다.
-chrome.storage.local.get(["zetaOwnerUid"], (result) => {
-  if (result.zetaOwnerUid) {
-    ensureSignedIn().then(() => startListening(result.zetaOwnerUid));
+// (offscreen 문서는 chrome.storage를 직접 못 읽으므로) background에게
+// 마지막으로 저장해둔 ownerUid를 물어봐서 자동으로 구독을 재개합니다.
+chrome.runtime.sendMessage(
+  { target: "background", type: "REQUEST_OWNER_UID" },
+  (response) => {
+    if (response?.ownerUid) {
+      ensureSignedIn().then(() => startListening(response.ownerUid));
+    }
   }
-});
+);
 
 log("offscreen document 준비 완료");
