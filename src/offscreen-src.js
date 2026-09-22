@@ -55,7 +55,7 @@ function startListening(ownerUid) {
       snapshot.forEach((doc) => {
         const data = doc.data();
         // 모바일 쪽 문서 형태: { imageUrl: string, updatedAt: Timestamp }
-        mappings[doc.id] = data.imageUrl;
+        mappings[doc.id] = "data:image/jpeg;base64," + data.imageBase64;
       });
 
       log(`매핑 ${Object.keys(mappings).length}건 수신`, mappings);
