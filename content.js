@@ -1,17 +1,15 @@
-// ⚠️ zeta-ai.io의 실제 DOM 구조(클래스명 등)는 확인 전이라, 이 파일의 셀렉터는
-// "이름 텍스트를 찾고 그 근처에 배지를 얹는다"는 범용 휴리스틱으로 작성했습니다.
-// 실제 사이트에서 개발자 도구로 구조를 확인한 뒤, findNameCandidates()의
-// 셀렉터 부분만 사이트에 맞게 다듬으면 됩니다. (안드로이드 앱의 "이름 기반 매칭"과
-// 같은 컨셉을 웹 DOM 버전으로 옮긴 것)
+// zeta-ai.io 실제 페이지 소스를 확인한 결과, 캐릭터 아바타 <img> 태그가
+// alt="캐릭터이름" 속성을 정확히 갖고 있는 걸 확인했습니다 (기본 프로필이든
+// 실제 업로드 사진이든 동일). 그래서 텍스트로 이름을 찾는 대신, 이 img를
+// 직접 찾아서 그 자리에 우리 이미지를 덮어씌우는 방식으로 짰습니다.
 
 (() => {
   const OVERLAY_CLASS = "zeta-overlay-pc-badge";
-  const MAX_NAME_TEXT_LENGTH = 20; // 이 길이보다 긴 텍스트는 캐릭터 이름이 아니라고 간주
 
   /** @type {Record<string, string>} 캐릭터명 -> 이미지 URL */
   let mappings = {};
 
-  // node -> 오버레이 엘리먼트. 이름 노드가 DOM에서 사라지면 같이 정리하기 위해 사용.
+  // 원본 <img> 엘리먼트 -> 우리가 덮어씌운 배지 엘리먼트
   const activeOverlays = new Map();
 
   function log(...args) {
@@ -35,44 +33,19 @@
     scheduleScan();
   });
 
-  // ---- 캐릭터 이름 후보 찾기 ---------------------------------------------------
+  // ---- 아바타 <img> 찾기 --------------------------------------------------------
 
-  /**
-   * 페이지에서 "캐릭터 이름 텍스트"로 보이는 후보 엘리먼트를 찾습니다.
-   * TODO(실사이트 확인 후 다듬기): 지금은 아주 일반적인 방식으로,
-   *   - 매핑에 등록된 이름 문자열과 정확히 일치하는 텍스트만 가진 leaf 엘리먼트를 찾습니다.
-   *   - 채팅 목록/랭킹 카드 등에서 이름이 표시되는 실제 태그(span, div 등)를 devtools로
-   *     확인해서 querySelector 범위를 좁히면 오탐이 줄고 성능도 좋아집니다.
-   */
-  function findNameCandidates() {
+  function findAvatarImages() {
     const names = Object.keys(mappings);
     if (names.length === 0) return [];
 
     const nameSet = new Set(names);
-    const candidates = [];
-
-    // 너무 넓은 범위를 매 스캔마다 훑는 건 비용이 크니, 텍스트 길이로 1차 필터링
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_ELEMENT,
-      {
-        acceptNode(el) {
-          if (el.classList.contains(OVERLAY_CLASS)) return NodeFilter.FILTER_REJECT;
-          const text = el.textContent?.trim();
-          if (!text || text.length > MAX_NAME_TEXT_LENGTH) return NodeFilter.FILTER_SKIP;
-          // leaf 엘리먼트(자식 엘리먼트가 없는)만: 상위 컨테이너가 같은 텍스트를
-          // 중복으로 갖고 있는 경우를 걸러내기 위함
-          if (el.children.length > 0) return NodeFilter.FILTER_SKIP;
-          return nameSet.has(text) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
-        },
-      }
-    );
-
-    let node;
-    while ((node = walker.nextNode())) {
-      candidates.push(node);
-    }
-    return candidates;
+    const imgs = document.querySelectorAll("img[alt]");
+    const matched = [];
+    imgs.forEach((img) => {
+      if (nameSet.has(img.alt)) matched.push(img);
+    });
+    return matched;
   }
 
   // ---- 오버레이 배치 -----------------------------------------------------------
@@ -91,16 +64,14 @@
     return badge;
   }
 
-  function positionBadge(badge, nameEl) {
-    const rect = nameEl.getBoundingClientRect();
-    // 이름 라벨의 왼쪽 위 근처에 살짝 겹치도록 배치 (안드로이드 버전의
-    // "자기 높이만큼 위로 보정"과 비슷한 취지 — 실제 사이트에서 위치가
-    // 어색하면 여기 오프셋만 조정하면 됩니다)
-    const size = 40;
-    badge.style.left = `${rect.left - size / 2}px`;
-    badge.style.top = `${rect.top - size}px`;
-    badge.style.width = `${size}px`;
-    badge.style.height = `${size}px`;
+  function positionBadge(badge, originalImg) {
+    const rect = originalImg.getBoundingClientRect();
+    badge.style.left = `${rect.left}px`;
+    badge.style.top = `${rect.top}px`;
+    badge.style.width = `${rect.width}px`;
+    badge.style.height = `${rect.height}px`;
+    badge.style.borderRadius =
+      getComputedStyle(originalImg).borderRadius || "50%";
   }
 
   function scan() {
@@ -109,31 +80,37 @@
       return;
     }
 
-    const candidates = findNameCandidates();
-    const seenNodes = new Set();
+    const avatarImgs = findAvatarImages();
+    const seen = new Set();
 
-    for (const nameEl of candidates) {
-      const characterName = nameEl.textContent.trim();
+    for (const img of avatarImgs) {
+      const characterName = img.alt;
       const imageUrl = mappings[characterName];
       if (!imageUrl) continue;
 
-      seenNodes.add(nameEl);
+      seen.add(img);
 
-      let badge = activeOverlays.get(nameEl);
+      let badge = activeOverlays.get(img);
       if (!badge || badge.dataset.imageUrl !== imageUrl) {
         badge?.remove();
         badge = createBadge(imageUrl, characterName);
         badge.dataset.imageUrl = imageUrl;
-        activeOverlays.set(nameEl, badge);
+        activeOverlays.set(img, badge);
       }
-      positionBadge(badge, nameEl);
+      const rect = img.getBoundingClientRect();
+      const visible =
+        rect.bottom > 0 &&
+        rect.top < window.innerHeight &&
+        rect.right > 0 &&
+        rect.left < window.innerWidth;
+      badge.style.display = visible ? "block" : "none";
+      if (visible) positionBadge(badge, img);
     }
 
-    // 더 이상 화면에 없는 이름 노드의 배지는 정리
-    for (const [nameEl, badge] of activeOverlays) {
-      if (!seenNodes.has(nameEl) || !document.contains(nameEl)) {
+    for (const [img, badge] of activeOverlays) {
+      if (!seen.has(img) || !document.contains(img)) {
         badge.remove();
-        activeOverlays.delete(nameEl);
+        activeOverlays.delete(img);
       }
     }
   }
@@ -155,15 +132,12 @@
       </div>
     `;
     overlay.addEventListener("click", () => overlay.remove());
-    document.addEventListener(
-      "keydown",
-      function onEsc(e) {
-        if (e.key === "Escape") {
-          overlay.remove();
-          document.removeEventListener("keydown", onEsc);
-        }
+    document.addEventListener("keydown", function onEsc(e) {
+      if (e.key === "Escape") {
+        overlay.remove();
+        document.removeEventListener("keydown", onEsc);
       }
-    );
+    });
     document.body.appendChild(overlay);
   }
 
@@ -183,10 +157,11 @@
   mutationObserver.observe(document.body, {
     childList: true,
     subtree: true,
-    characterData: true,
+    attributes: true,
+    attributeFilter: ["alt", "src"],
   });
 
-  window.addEventListener("scroll", scheduleScan, { passive: true });
+  window.addEventListener("scroll", scheduleScan, { passive: true, capture: true });
   window.addEventListener("resize", scheduleScan, { passive: true });
 
   loadMappings();
