@@ -51,7 +51,7 @@ jobs:
 
   deploy-rules:
     runs-on: ubuntu-latest
-    # firestore.rules/storage.rules가 바뀐 push에서만 배포하고 싶다면 아래 if 조건의
+    # firestore.rules가 바뀐 push에서만 배포하고 싶다면 아래 if 조건의
     # paths 필터를 이 job에 추가하거나, on.push.paths로 워크플로 자체를 제한해도 됩니다.
     steps:
       - uses: actions/checkout@v4
@@ -66,9 +66,9 @@ jobs:
         with:
           node-version: 20
 
-      - name: Deploy Firestore & Storage rules
+      - name: Deploy Firestore rules
         run: |
           npx firebase-tools@latest deploy \
-            --only firestore:rules,storage:rules \
+            --only firestore:rules \
             --project "${{ secrets.FIREBASE_PROJECT_ID }}" \
             --non-interactive
