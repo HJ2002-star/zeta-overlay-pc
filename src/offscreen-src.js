@@ -4,10 +4,10 @@
 // 오래 살아있는 offscreen 문서 쪽에서 리스너를 유지합니다.
 
 import { initializeApp } from "firebase/app";
-// firebase/auth/web-extension: 크롬 익스텐션 환경(서비스 워커, 팝업, offscreen 문서)에서
+// firebase/auth: 크롬 익스텐션 환경(서비스 워커, 팝업, offscreen 문서)에서
 // signInAnonymously 등을 안전하게 쓰기 위한 Firebase 공식 진입점입니다.
 // (signInWithPopup처럼 별도 웹사이트+iframe이 필요한 방식이 아니라면 이걸로 충분합니다)
-import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth/web-extension";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import {
   getFirestore,
   collection,
