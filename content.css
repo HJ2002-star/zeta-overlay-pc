@@ -1,0 +1,40 @@
+.zeta-overlay-pc-badge {
+  position: fixed;
+  z-index: 2147483000;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  object-fit: cover;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.zeta-overlay-pc-fullpreview {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.zeta-overlay-pc-fullpreview-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.zeta-overlay-pc-fullpreview-inner img {
+  max-width: 80vw;
+  max-height: 80vh;
+  border-radius: 8px;
+}
+
+.zeta-overlay-pc-fullpreview-name {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}

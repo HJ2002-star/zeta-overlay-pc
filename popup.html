@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Zeta Overlay 설정</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <h1>Zeta Overlay (PC)</h1>
+
+    <label for="ownerUid">폰 Owner UID</label>
+    <input id="ownerUid" type="text" placeholder="폰 앱에서 복사한 UID를 붙여넣으세요" />
+    <button id="saveBtn">연결/저장</button>
+    <button id="clearBtn" class="secondary">연결 해제</button>
+
+    <div id="status" class="status"></div>
+
+    <p class="hint">
+      폰 앱의 MainActivity에서 표시되는 "Owner UID"를 그대로 복사해서 붙여넣으면,
+      해당 폰과 매핑 데이터가 실시간으로 동기화됩니다.
+    </p>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

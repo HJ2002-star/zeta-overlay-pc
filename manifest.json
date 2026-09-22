@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Zeta Overlay (PC)",
+  "version": "0.1.0",
+  "description": "제타(zeta-ai.io) 웹버전 위에 캐릭터 이미지를 오버레이합니다. 매핑은 안드로이드 앱과 Firestore로 실시간 동기화됩니다.",
+  "permissions": ["offscreen", "storage"],
+  "host_permissions": ["https://zeta-ai.io/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Zeta Overlay 설정"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://zeta-ai.io/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
